@@ -65,6 +65,14 @@ function isRecent(date, days = 14) {
 
 // ============ Twitter 抓取 ============
 
+// 过滤低质量推文
+function isQualityTweet(tweet) {
+  if (!tweet.text || tweet.text.length < 50) return false;  // 太短不要
+  const lowQuality = ['giveaway', 'follow to win', 'DM for', 'check link bio', 'link in bio', 'subscribe', 'free followers'];
+  const lower = tweet.text.toLowerCase();
+  return !lowQuality.some(q => lower.includes(q));
+}
+
 async function fetchTwitterTweets() {
   if (!TWITTER_API.key) {
     console.log('  ⚠️ 未配置 Twitter API Key');
@@ -94,7 +102,9 @@ async function fetchTwitterTweets() {
       if (data.tweets && data.tweets.length > 0) {
         console.log(`${data.tweets.length} 条`);
         
-        data.tweets.slice(0, 3).forEach(tweet => {
+        // 过滤后取高质量推文
+        const qualityTweets = data.tweets.filter(isQualityTweet).slice(0, 3);
+        qualityTweets.forEach(tweet => {
           tweets.push({
             title: tweet.text?.substring(0, 100) || 'Twitter',
             link: `https://twitter.com/i/status/${tweet.id}`,

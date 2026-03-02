@@ -31,7 +31,11 @@ const RSS_SOURCES = [
 const TWITTER_API = {
   key: process.env.TWITTER_API_KEY || '',
   baseUrl: 'https://api.twitterapi.io',
-  searchQueries: ['AI', 'LLM', 'GPT', 'Claude', 'OpenAI', 'Anthropic', 'Gemini'],
+  // 更精准的AI相关关键词，过滤掉杂七杂八的内容
+  searchQueries: [
+    'AI OR LLM OR GPT OR Claude OR "ChatGPT" OR "OpenAI" OR Anthropic OR Gemini OR "deep learning" OR "machine learning"',
+    'AI model OR "AI startup" OR "AI funding" OR "AI product" OR "AI release"'
+  ],
 };
 
 // 飞书配置
