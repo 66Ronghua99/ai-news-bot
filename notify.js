@@ -49,6 +49,19 @@ function readAINews() {
   return items;
 }
 
+// 清理摘要中的markdown格式
+function cleanSummary(summary) {
+  return summary
+    .replace(/^## .+$/gm, '')  // 移除 ## 标题
+    .replace(/^#.+$/gm, '')     // 移除 # 标题
+    .replace(/\*\*/g, '')       // 移除 **加粗**
+    .replace(/^### .+$/gm, '') // 移除 ### 小标题
+    .replace(/^-.+$/gm, '')    // 移除 - 列表
+    .replace(/^\d+\. .+$/gm, '') // 移除数字列表
+    .replace(/^• /gm, '  • ')   // 保留 • 列表
+    .trim();
+}
+
 // 发送到飞书
 function sendToFeishu(items) {
   if (!FEISHU_WEBHOOK) {
@@ -61,17 +74,22 @@ function sendToFeishu(items) {
     return;
   }
   
-  // 构建消息 - 完整显示摘要
+  // 构建消息
   let text = `🤖 **AI News - ${new Date().toLocaleDateString('zh-CN')}**\n\n`;
   
   for (const item of items.slice(0, 5)) {
     text += `━━━━━━━━━━━━━━━━━━\n`;
     text += `📰 ${item.source}\n`;
-    text += `💡 ${item.title}\n\n`;
     
-    // 提取核心观点（摘要的第一句或一段）
-    const corePoints = item.summary.split('\n').slice(0, 5).join('\n');
-    text += `${corePoints.substring(0, 800)}\n`;
+    // 清理标题中的 markdown
+    const cleanTitle = item.title.replace(/\*\*/g, '').replace(/^# .+\n/, '').trim();
+    text += `💡 ${cleanTitle.substring(0, 100)}\n\n`;
+    
+    // 清理并提取摘要核心内容
+    const cleanSummaryText = cleanSummary(item.summary);
+    // 只取前面几段核心内容
+    const coreContent = cleanSummaryText.split('\n').filter(line => line.trim()).slice(0, 6).join('\n');
+    text += `${coreContent.substring(0, 600)}\n`;
     
     if (item.link) {
       text += `\n🔗 ${item.link}\n`;
@@ -86,7 +104,7 @@ function sendToFeishu(items) {
   try {
     const payload = JSON.stringify({ 
       msg_type: 'text', 
-      content: { text: text.substring(0, 8000) }  // 飞书限制8000字
+      content: { text: text.substring(0, 8000) }
     });
     execSync(
       `curl -sL -X POST -H "Content-Type: application/json" -d '${payload.replace(/'/g, "\\'")}' "${FEISHU_WEBHOOK}"`,
