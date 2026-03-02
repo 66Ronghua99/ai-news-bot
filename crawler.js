@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { RSS_SOURCES } = require('./config');
+const { RSS_SOURCES, TWITTER_API } = require('./config');
 const { summarizeWithMiniMax } = require('./summarize');
 
 const OUTPUT_FILE = path.join(process.env.HOME, '.openclaw/workspace/memory/ai-news.md');
@@ -63,6 +63,61 @@ function isRecent(date, days = 14) {
   return diff <= days;
 }
 
+// ============ Twitter 抓取 ============
+
+async function fetchTwitterTweets() {
+  if (!TWITTER_API.key) {
+    console.log('  ⚠️ 未配置 Twitter API Key');
+    return [];
+  }
+  
+  const tweets = [];
+  
+  console.log('\n🐦 抓取 Twitter...\n');
+  
+  for (const query of TWITTER_API.searchQueries) {
+    // 添加英文过滤 + 北美地区
+    const enrichedQuery = `${query} lang:en near:"United States"`;
+    process.stdout.write(`  → 查询: "${enrichedQuery.substring(0, 30)}..." `);
+    
+    try {
+      const encodedQuery = encodeURIComponent(enrichedQuery);
+      const url = `${TWITTER_API.baseUrl}/twitter/tweet/advanced_search?query=${encodedQuery}&queryType=Latest`;
+      
+      const result = execSync(
+        `curl -sL -H "x-api-key: ${TWITTER_API.key}" "${url}"`,
+        { encoding: 'utf8', timeout: 30000, maxBuffer: 10 * 1024 * 1024 }
+      );
+      
+      const data = JSON.parse(result);
+      
+      if (data.tweets && data.tweets.length > 0) {
+        console.log(`${data.tweets.length} 条`);
+        
+        data.tweets.slice(0, 3).forEach(tweet => {
+          tweets.push({
+            title: tweet.text?.substring(0, 100) || 'Twitter',
+            link: `https://twitter.com/i/status/${tweet.id}`,
+            description: tweet.text || '',
+            pubDate: new Date(tweet.created_at || Date.now()),
+            source: 'Twitter'
+          });
+        });
+      } else {
+        console.log('0 条');
+      }
+      
+      // 避免超过速率限制
+      await new Promise(r => setTimeout(r, 6000));
+      
+    } catch (e) {
+      console.log(`❌ ${e.message}`);
+    }
+  }
+  
+  return tweets;
+}
+
 function containsAIKeywords(text) {
   const keywords = [
     'ai', 'llm', 'gpt', 'claude', 'openai', 'anthropic', 'gemini',
@@ -111,7 +166,7 @@ function summarizeWithKimi(article) {
 // ============ 主函数 ============
 
 async function main() {
-  console.log('\n🤖 AI News Crawler (Kimi Enhanced)\n');
+  console.log('\n🤖 AI News Crawler (MiniMax + Twitter)\n');
   
   const allContent = [];
   
@@ -133,6 +188,10 @@ async function main() {
       console.log('❌');
     }
   }
+  
+  // 抓取 Twitter
+  const twitterTweets = await fetchTwitterTweets();
+  allContent.push(...twitterTweets);
   
   // 去重排序
   const seen = new Set();

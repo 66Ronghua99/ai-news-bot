@@ -1,5 +1,7 @@
 // ============ 配置 ============
 
+require('dotenv').config();
+
 const RSS_SOURCES = [
   { name: 'Google DeepMind', rss: 'https://blog.google/technology/ai/rss/', aiOnly: true },
   { name: 'Meta AI', rss: 'https://ai.meta.com/blog/rss.xml', aiOnly: true },
@@ -25,4 +27,24 @@ const RSS_SOURCES = [
   { name: 'Interconnect', rss: 'https://interconnect.fm/feed.xml', aiOnly: true },
 ];
 
-module.exports = { RSS_SOURCES };
+// Twitter API 配置
+const TWITTER_API = {
+  key: process.env.TWITTER_API_KEY || '',
+  baseUrl: 'https://api.twitterapi.io',
+  searchQueries: ['AI', 'LLM', 'GPT', 'Claude', 'OpenAI', 'Anthropic', 'Gemini'],
+};
+
+// 飞书配置
+const FEISHU_WEBHOOK = process.env.FEISHU_WEBHOOK || '';
+
+// Google Sheets 配置
+const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT || '';
+const GOOGLE_SHEET_ID = process.env.GOOGLE_SHEET_ID || '';
+
+module.exports = { 
+  RSS_SOURCES, 
+  TWITTER_API, 
+  FEISHU_WEBHOOK,
+  GOOGLE_SERVICE_ACCOUNT,
+  GOOGLE_SHEET_ID
+};

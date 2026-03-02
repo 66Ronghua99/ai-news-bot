@@ -11,6 +11,7 @@
   "license": "ISC",
   "dependencies": {
     "bird": "^0.7.0",
+    "dotenv": "^16.0.0",
     "puppeteer-core": "^24.37.5"
   }
 }
