@@ -76,7 +76,7 @@ function sendToFeishu(items) {
     text += `**${item.source}**\n`;
     text += `${core}...\n`;
     if (item.link) {
-      text += `<${item.link|链接}>\n`;
+      text += `<${item.link}> 链接\n`;
     }
     text += '\n';
   }
