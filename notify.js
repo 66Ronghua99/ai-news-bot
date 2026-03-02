@@ -6,7 +6,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { FEISHU_WEBHOOK, GOOGLE_SERVICE_ACCOUNT, GOOGLE_SHEET_ID } = require('./config');
+const { FEISHU_WEBHOOK } = require('./config');
 
 // 读取 AI News 文件
 function readAINews() {
@@ -19,40 +19,34 @@ function readAINews() {
   
   const content = fs.readFileSync(filePath, 'utf8');
   
-  // 提取今天的内容
-  const today = new Date().toLocaleDateString('zh-CN');
+  // 按 ## 分割获取每个来源
   const sections = content.split(/^## /m);
-  
-  const todayItems = [];
+  const items = [];
   
   for (const section of sections) {
-    if (!section.trim()) continue;
+    if (!section.trim() || section.startsWith('AI News Summary')) continue;
     
     const lines = section.split('\n');
-    const source = lines[0]?.trim();
-    if (!source) continue;
+    const source = lines[0]?.trim() || 'Unknown';
     
-    // 查找今日内容
-    const hasToday = section.includes(today) || section.includes(new Date().toISOString().split('T')[0]);
+    // 提取标题
+    const titleMatch = section.match(/\*\*([^*]+)\*\*/);
+    const title = titleMatch?.[1] || '';
     
-    if (hasToday || source.includes('AI News')) {
-      // 提取摘要
-      const summaryMatch = section.match(/📝 \*\*MiniMax摘要\*\*: ([^\n]+)/);
-      const linkMatch = section.match(/🔗 \[原文链接\]\(([^)]+)\)/);
-      const titleMatch = section.match(/\*\*([^*]+)\*\*/);
-      
-      if (titleMatch) {
-        todayItems.push({
-          source: source,
-          title: titleMatch[1],
-          summary: summaryMatch?.[1] || '',
-          link: linkMatch?.[1] || ''
-        });
-      }
+    // 提取摘要（MiniMax生成的完整内容）
+    const summaryMatch = section.match(/📝 \*\*MiniMax摘要\*\*:([\s\S]*?)(?=🔗|$)/);
+    let summary = summaryMatch?.[1]?.trim() || '';
+    
+    // 提取链接
+    const linkMatch = section.match(/🔗 \[原文链接\]\(([^)]+)\)/);
+    const link = linkMatch?.[1] || '';
+    
+    if (title && summary) {
+      items.push({ source, title, summary, link });
     }
   }
   
-  return todayItems;
+  return items;
 }
 
 // 发送到飞书
@@ -67,23 +61,33 @@ function sendToFeishu(items) {
     return;
   }
   
-  // 构建消息
+  // 构建消息 - 完整显示摘要
   let text = `🤖 **AI News - ${new Date().toLocaleDateString('zh-CN')}**\n\n`;
   
   for (const item of items.slice(0, 5)) {
-    // 提取核心观点
-    const core = item.summary.split('。')[0] || item.summary.substring(0, 50);
-    text += `**${item.source}**\n`;
-    text += `${core}...\n`;
+    text += `━━━━━━━━━━━━━━━━━━\n`;
+    text += `📰 ${item.source}\n`;
+    text += `💡 ${item.title}\n\n`;
+    
+    // 提取核心观点（摘要的第一句或一段）
+    const corePoints = item.summary.split('\n').slice(0, 5).join('\n');
+    text += `${corePoints.substring(0, 800)}\n`;
+    
     if (item.link) {
-      text += `<${item.link}> 链接\n`;
+      text += `\n🔗 ${item.link}\n`;
     }
     text += '\n';
   }
   
+  text += `━━━━━━━━━━━━━━━━━━\n`;
+  text += `共 ${items.length} 条`;
+  
   // 发送
   try {
-    const payload = JSON.stringify({ msg_type: 'text', content: { text } });
+    const payload = JSON.stringify({ 
+      msg_type: 'text', 
+      content: { text: text.substring(0, 8000) }  // 飞书限制8000字
+    });
     execSync(
       `curl -sL -X POST -H "Content-Type: application/json" -d '${payload.replace(/'/g, "\\'")}' "${FEISHU_WEBHOOK}"`,
       { encoding: 'utf8' }
@@ -94,26 +98,14 @@ function sendToFeishu(items) {
   }
 }
 
-// 写入 Google Sheets
-function writeToSheets(items) {
-  if (!GOOGLE_SERVICE_ACCOUNT || !GOOGLE_SHEET_ID) {
-    console.log('⚠️ 未配置 Google Sheets');
-    return;
-  }
-  
-  console.log('📊 写入 Google Sheets...');
-  // 这里可以调用 gsheet.py
-}
-
 // 主函数
 function main() {
   console.log('\n📰 AI News Notify\n');
   
   const items = readAINews();
-  console.log(`找到 ${items.length} 条今日内容`);
+  console.log(`找到 ${items.length} 条内容`);
   
   sendToFeishu(items);
-  writeToSheets(items);
 }
 
 main();
